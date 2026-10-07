@@ -6,6 +6,7 @@
 <%inherit file="/main.html" />
 <%block name="headextra">
 <%static:css group='style-course'/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
 </%block>
 <%include file="/courseware/course_navigation.html" args="active_page='eol_feedback'" />
 
@@ -147,7 +148,7 @@
                         counter_preg_evaluadas = 0
                         format_preg_evaluadas = ""
                         for subsection in section['sections']:
-                            if subsection.format and ('Preguntas Evaluadas' in subsection.format or 'Preguntas Calificadas' in subsection.format):
+                            if format_matches(subsection.format, graded_formats):
                                 counter_preg_evaluadas += 1
                                 percent_preg_evaluadas += subsection.percent_graded
                                 format_preg_evaluadas = subsection.format
@@ -179,7 +180,7 @@
                         </div>
                     % endif
                     %for subsection in section['sections']:
-                        % if subsection.format and ('Control' in subsection.format):
+                        % if format_matches(subsection.format, control_formats):
                             <!-- Control -->
                             <!-- Calculo el porcentaje a partir del ptje porque sino no llega con decimales -->
                             <!-- Aprovecho mismo ciclo de tareas logradas y no logradas -->
@@ -264,7 +265,7 @@
                 % endif
 
                 %for subsection in section['sections']:
-                    % if subsection.format and ('Control' in subsection.format):
+                    % if format_matches(subsection.format, control_formats):
                         <h2 class="hd hd-2 my-2 text-center text-primary">${subsection.format}</h2>
                         <div class="row d-flex bg-light my-2 p-4" id="feedback-general">
                             %for block, score in subsection.problem_scores.items():

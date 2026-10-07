@@ -28,6 +28,11 @@ from django.core.cache import cache
 
 from django.urls import reverse
 
+# Default subsection formats (assignment types) used when the course doesn't define
+# "eol_feedback" in Studio's "Other Course Settings"
+DEFAULT_GRADED_FORMATS = ['Preguntas Evaluadas', 'Preguntas Calificadas']
+DEFAULT_CONTROL_FORMATS = ['Control']
+
 
 def _get_context(request, course_id):
     """
@@ -48,7 +53,8 @@ def _get_context(request, course_id):
         course = get_course_with_access(student, 'load', course_key, check_if_enrolled=True)
     course_grade = CourseGradeFactory().read(student, course)  # Student grades
     courseware_summary = list(course_grade.chapter_grades.values())
-    course_expiration_fragment = generate_course_expired_fragment(student, course)    
+    course_expiration_fragment = generate_course_expired_fragment(student, course)
+    graded_formats, control_formats = _get_feedback_formats(course)
     
     context = {
         "course": course,
@@ -67,6 +73,9 @@ def _get_context(request, course_id):
         "grade_percent_scaled": grade_percent_scaled,
         "get_section_visibility": get_section_visibility,
         "get_feedback": get_feedback,
+        "graded_formats": graded_formats,
+        "control_formats": control_formats,
+        "format_matches": format_matches,
         "update_url": reverse('feedback_post_update'),
         "set_visibility_url": reverse('feedback_post_set_visibility'),
     }
@@ -106,6 +115,42 @@ def _get_course_info(course, course_key):
         cache.set("eol_feedback-" + course_key._to_string() + "-course_info", data, 60 * 5)
 
     return data[0], data[1], data[2], data[3]  # grade_cutoff, avg_grade, min_grade, max_grade
+
+
+def _get_feedback_formats(course):
+    """
+        Return the subsection formats for graded questions and controls.
+        Read from course "Other Course Settings" (ENABLE_OTHER_COURSE_SETTINGS), e.g.
+        {"eol_feedback": {"graded_formats": ["Preguntas Calificadas"], "control_formats": ["Control"]}}
+        Fall back to the defaults when a key is missing or invalid.
+    """
+    feedback_settings = (course.other_course_settings or {}).get('eol_feedback')
+    if not isinstance(feedback_settings, dict):
+        feedback_settings = {}
+    graded_formats = _clean_formats(feedback_settings.get('graded_formats')) or DEFAULT_GRADED_FORMATS
+    control_formats = _clean_formats(feedback_settings.get('control_formats')) or DEFAULT_CONTROL_FORMATS
+    return graded_formats, control_formats
+
+
+def _clean_formats(formats):
+    """
+        Return a list of non-empty strings. Accept a single string or a list of strings.
+    """
+    if isinstance(formats, str):
+        formats = [formats]
+    if not isinstance(formats, list):
+        return []
+    return [f.strip() for f in formats if isinstance(f, str) and f.strip()]
+
+
+def format_matches(subsection_format, formats):
+    """
+        Return true if the subsection format contains any of the formats (case-insensitive).
+    """
+    if not subsection_format:
+        return False
+    subsection_format = subsection_format.lower()
+    return any(f.lower() in subsection_format for f in formats)
 
 
 def grade_percent_scaled(grade_percent, grade_cutoff):
