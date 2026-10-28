@@ -177,3 +177,38 @@ class TestStaffView(UrlResetMixin, ModuleStoreTestCase):
         grade_cutoff, avg_grade, min_grade, max_grade = views._get_course_info(course, course_key)
         self.assertEqual(grade_cutoff, 0.5)
         self.assertEqual(max_grade, 1.1)
+
+    def test_get_feedback_formats_default(self):
+        course = Mock(other_course_settings={})
+        graded_formats, control_formats = views._get_feedback_formats(course)
+        self.assertEqual(graded_formats, views.DEFAULT_GRADED_FORMATS)
+        self.assertEqual(control_formats, views.DEFAULT_CONTROL_FORMATS)
+
+    def test_get_feedback_formats_from_course_settings(self):
+        course = Mock(other_course_settings={
+            'eol_feedback': {
+                'graded_formats': ['Preguntas Calificadas', '  ', 3],
+                'control_formats': 'Prueba',
+            }
+        })
+        graded_formats, control_formats = views._get_feedback_formats(course)
+        self.assertEqual(graded_formats, ['Preguntas Calificadas'])
+        self.assertEqual(control_formats, ['Prueba'])
+
+    def test_get_feedback_formats_invalid_settings(self):
+        course = Mock(other_course_settings={'eol_feedback': ['Control']})
+        graded_formats, control_formats = views._get_feedback_formats(course)
+        self.assertEqual(graded_formats, views.DEFAULT_GRADED_FORMATS)
+        self.assertEqual(control_formats, views.DEFAULT_CONTROL_FORMATS)
+
+        course = Mock(other_course_settings={'eol_feedback': {'graded_formats': [], 'control_formats': None}})
+        graded_formats, control_formats = views._get_feedback_formats(course)
+        self.assertEqual(graded_formats, views.DEFAULT_GRADED_FORMATS)
+        self.assertEqual(control_formats, views.DEFAULT_CONTROL_FORMATS)
+
+    def test_format_matches(self):
+        self.assertTrue(views.format_matches('Control 1', ['control']))
+        self.assertTrue(views.format_matches('Preguntas Calificadas', ['Preguntas Evaluadas', 'preguntas calificadas']))
+        self.assertFalse(views.format_matches('Homework', ['Control']))
+        self.assertFalse(views.format_matches(None, ['Control']))
+        self.assertFalse(views.format_matches('', ['Control']))
